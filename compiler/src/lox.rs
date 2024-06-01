@@ -1,10 +1,10 @@
 use std::{
     fs,
-    io::{self, Write},
+    io::{self, Error, Write},
     process::exit,
 };
 
-use crate::lexer::Lexer;
+use crate::lexer;
 
 #[derive(Default)]
 pub struct Lox {
@@ -12,36 +12,26 @@ pub struct Lox {
 }
 
 impl Lox {
-    fn run(&mut self, source: String) {
-        let mut lexer = Lexer::new(source);
-        let tokens = lexer.scan_tokens();
+    fn run(&mut self, source: &str) {
+        let tokens = lexer::scan_tokens(source);
 
         match tokens {
-            Ok(()) => {
-                for token in lexer.tokens {
-                    println!("{:?}", token)
-                }
+            Ok(tokens) => {
+                dbg!(tokens);
             }
-            Err(errs) => {
-                for (line, message) in errs {
-                    self.error(line, &message);
-                }
-
-                for token in lexer.tokens {
-                    println!("{:?}", token)
-                }
+            Err(errors) => {
+                self.had_error = true;
+                dbg!(errors);
             }
-        }
+        };
     }
 
-    pub fn run_file(&mut self, path: &str) {
-        let source = fs::read_to_string(path).unwrap();
+    pub fn run_file(&mut self, path: &str) -> Result<(), Error> {
+        let source = fs::read_to_string(path)?;
 
-        self.run(source);
+        self.run(&source[0..source.len()]);
 
-        if self.had_error {
-            exit(65);
-        }
+        Ok(())
     }
 
     pub fn run_promt(&mut self) {
@@ -49,26 +39,18 @@ impl Lox {
 
         print!("> ");
         io::stdout().flush().unwrap();
+
         match io::stdin().read_line(&mut input) {
             Ok(input_len) => {
-                self.run(input);
+                self.run(&input);
 
                 self.had_error = false;
 
                 if input_len > 1 {
-                    self.run_promt()
+                    self.run_promt();
                 }
             }
-            Err(error) => println!("{error}"),
+            Err(error) => println!("Line is not a valid UTF-8: {error}"),
         }
-    }
-
-    pub fn error(&mut self, line: usize, message: &String) {
-        self.report(line, "", message);
-    }
-
-    fn report(&mut self, line: usize, r#where: &str, message: &str) {
-        println!("[line: {line}] Error {where}: {message}");
-        self.had_error = true;
     }
 }
